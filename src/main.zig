@@ -1,6 +1,7 @@
 const std = @import("std");
 const cli = @import("cli.zig");
 const AppError = @import("app_errors.zig").AppError;
+const Shamir = @import("shamir.zig");
 
 pub fn main() !void {
     var args_iterator = std.process.args();
@@ -11,6 +12,9 @@ pub fn main() !void {
         return err;
     };
 
-    std.debug.print("Secret: {d}\n", .{parsed_args.secret});
-    std.debug.print("Creating {d} shares with threshold {d}\n", .{ parsed_args.num_shares, parsed_args.threshold });
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
+    try Shamir.testSplit(allocator, parsed_args.secret, parsed_args.threshold, parsed_args.num_shares);
 }

@@ -2,7 +2,7 @@ const std = @import("std");
 const AppError = @import("app_errors.zig").AppError;
 
 pub const CliArgs = struct {
-    secret: u32,
+    secret: u8,
     num_shares: u8,
     threshold: u8,
 };
@@ -28,7 +28,7 @@ pub fn parseArgs(program_name: []const u8, args_iterator: *std.process.ArgIterat
         return AppError.TooManyArguments;
     }
 
-    const secret: u32 = std.fmt.parseInt(u32, secret_str, 10) catch {
+    const secret: u8 = std.fmt.parseInt(u8, secret_str, 10) catch {
         std.debug.print("Error: Invalid secret value '{s}'. Must be a number.\n", .{secret_str});
         return AppError.InvalidArgument;
     };

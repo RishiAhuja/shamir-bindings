@@ -1,7 +1,7 @@
 const std = @import("std");
 const AppError = @import("app_errors.zig").AppError;
 
-const FieldSize: u8 = 257;
+const FieldSize: u8 = 251;
 
 pub const Share = struct {
     x: u8,
@@ -19,15 +19,15 @@ pub const ParticipantShare = struct {
 };
 
 fn add(a: u8, b: u8) u8 {
-    return (a + b) % FieldSize;
+    return @intCast((@as(u16, a) + @as(u16, b)) % FieldSize);
 }
 
 fn sub(a: u8, b: u8) u8 {
-    return (a + FieldSize - b) % FieldSize;
+    return @intCast((@as(u16, a) + FieldSize - @as(u16, b)) % FieldSize);
 }
 
 fn mul(a: u8, b: u8) u8 {
-    return (a * b) % FieldSize;
+    return @intCast((@as(u16, a) * @as(u16, b)) % FieldSize);
 }
 
 fn inv(a: u8) u8 {
@@ -84,20 +84,17 @@ const Shamir = struct {
         try coeffs.append(secret);
 
         // Initialize a cryptographically secure random number generator (CSPRNG).
-        var rng = std.rand.DefaultPrng.init(std.crypto.random.bytes(8));
+        var seed_buffer: [8]u8 = undefined;
+        std.crypto.random.bytes(&seed_buffer);
+        const seed = std.mem.readInt(u64, &seed_buffer, .little);
+        var rng = std.rand.DefaultPrng.init(seed);
         var rand_val_gen = rng.random();
 
         for (0..(threshold - 1)) |_| {
-            try coeffs.append(rand_val_gen.intRange(u8, 0, FieldSize));
+            try coeffs.append(rand_val_gen.uintLessThan(u8, FieldSize));
         }
 
         var shares = std.ArrayList(Share).init(allocator);
-
-        defer {
-            if (@errorReturnTrace() != null) {
-                shares.deinit();
-            }
-        }
 
         for (1..(num_shares + 1)) |i| {
             const x_coord: u8 = @intCast(i);
@@ -107,3 +104,48 @@ const Shamir = struct {
         return shares;
     }
 };
+
+pub fn printShares(shares: std.ArrayList(Share)) void {
+    std.debug.print("\n=== SHAMIR'S SECRET SHARES ===\n", .{});
+    std.debug.print("Total shares generated: {}\n", .{shares.items.len});
+    std.debug.print("Share format: (x, y) where x=participant_id, y=share_value\n", .{});
+    std.debug.print("----------------------------------------\n", .{});
+
+    for (shares.items, 0..) |share, index| {
+        std.debug.print("Share {}: (x={}, y={})\n", .{ index + 1, share.x, share.y });
+    }
+
+    std.debug.print("----------------------------------------\n", .{});
+    std.debug.print("Note: Any {} shares can reconstruct the secret\n", .{shares.items.len});
+    std.debug.print("=======================================\n\n", .{});
+}
+
+pub fn testSplit(allocator: std.mem.Allocator, secret: u8, threshold: u8, num_shares: u8) !void {
+    std.debug.print("Testing Shamir's Secret Sharing...\n\n", .{});
+
+    std.debug.print("Input Parameters:\n", .{});
+    std.debug.print("- Secret: {}\n", .{secret});
+    std.debug.print("- Threshold: {} (minimum shares needed to reconstruct)\n", .{threshold});
+    std.debug.print("- Total shares: {}\n", .{num_shares});
+    std.debug.print("- Field size: {} (prime modulus)\n\n", .{FieldSize});
+
+    // Generate shares
+    var shares = Shamir.split(secret, num_shares, threshold, allocator) catch |err| {
+        std.debug.print("Error generating shares: {}\n", .{err});
+        return err;
+    };
+    defer shares.deinit();
+
+    // Print the generated shares
+    printShares(shares);
+
+    // Demonstrate that shares are different each time (due to random coefficients)
+    std.debug.print("Generating shares again (should be different due to random coefficients):\n", .{});
+    var shares2 = Shamir.split(secret, num_shares, threshold, allocator) catch |err| {
+        std.debug.print("Error generating second set of shares: {}\n", .{err});
+        return err;
+    };
+    defer shares2.deinit();
+
+    printShares(shares2);
+}
