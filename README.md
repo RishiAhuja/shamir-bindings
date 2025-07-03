@@ -112,7 +112,7 @@ Threshold: 3
 Shares Input String: "1:109;2:19;3:215"
 Reconstructed Secret: 234
 Reconstruct operation completed successfully.
-```bash
+```
 
 ### Technical Details
 
